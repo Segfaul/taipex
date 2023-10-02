@@ -60,6 +60,15 @@ class ApiService:
             params={'api_key': self.api_key}
         )
         return response
+    
+    @log(logger)
+    async def get_user_list_admin(self):
+        response = await self.call_api(
+            root='/user/list/admin',
+            method='GET',
+            params={'api_key': self.api_key}
+        )
+        return response
 
     @log(logger)
     async def get_user_list_upstream(self):

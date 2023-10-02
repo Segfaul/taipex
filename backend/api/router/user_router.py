@@ -54,6 +54,24 @@ async def get_users(api_key: str):
     raise HTTPException(status_code=403, detail="Not enough rights to perform such an action")
 
 
+@router.get("/list/admin", tags=["User"])
+async def get_admin_users(api_key: str):
+    """
+    Get admin **user** list from database. Restricted to non-admin users.
+    """
+    admin_objs = await user_service.get_admins
+    
+    if api_key in [admin_obj['api_key'] for admin_obj in admin_objs]:
+        response = await user_service.get_admins
+
+        if response:
+            return response
+
+        raise HTTPException(status_code=404, detail="No users found in database")
+    
+    raise HTTPException(status_code=403, detail="Not enough rights to perform such an action")
+
+
 @router.get("/list/upstream", tags=["User"])
 async def get_ready_users(api_key: str):
     """

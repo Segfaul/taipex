@@ -7,7 +7,7 @@ from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import State, StatesGroup
 import aiogram.utils.markdown as md
 
-from app.logs import logger, log
+from backend.config import logger, log
 
 
 class Form(StatesGroup):
@@ -16,10 +16,11 @@ class Form(StatesGroup):
 
 class TelegramBot:
 
-    def __init__(self, api_token: str, api_service):
+    def __init__(self, api_token: str, api_service, web_app_url: str):
         self.bot = Bot(token=api_token)
         self.dp = Dispatcher(self.bot, storage=MemoryStorage())
         self.api_service = api_service
+        self.web_app_url = web_app_url
 
         self.handlers()
 
@@ -37,10 +38,10 @@ class TelegramBot:
     @classmethod
     def main_menu(cls, user: dict = None) -> list:
         menu = [
-            ["🔍 ARBITRAGE"],
+            ["🎁 Products"],
             [
-                f"💸 {user['percent'] if user and user['percent'] else '3.5'}%",
-                f"💡 {'ON' if user and user['status'] else 'OFF'}"
+                f"UPD KEY ({user['api_key'][-4::] if user and user['api_key'] else 'unset'}...)",
+                f"💡 {'ON' if user and user['notification'] else 'OFF'}"
             ],
             ["👤 ACC", "📎 HELP"]
         ]
@@ -60,24 +61,27 @@ class TelegramBot:
         @log(logger)
         @self.dp.message_handler(commands=['start'])
         async def commands_start(message: types.Message):
-            if (await self.user_service.add_user(message.from_user.id, message.from_user.username)) == 0:
-                for admin in (await self.user_service.get_admins):
-                    await self.bot.send_message(admin['id'],
-                                                f"&#128314           "
-                                                f"{md.hitalic('New user')}           "
-                                                f"&#128314\n\nStats:\n"
-                                                f"├{md.hbold('ID')}: {md.hcode(message.from_user.id)}\n"
-                                                f"├{md.hbold('Nick')}: @{message.from_user.username}\n"
-                                                f"├{md.hbold('Is_bot')}: {message.from_user.is_bot}\n"
-                                                , parse_mode='html')
+            if (await self.api_service.add_user(message.from_user.id, message.from_user.username)) == 0:
+                for admin in (await self.api_service.get_user_list_admin):
+                    await self.bot.send_message(
+                        admin['id'],
+                        f"&#128314           "
+                        f"{md.hitalic('New user')}           "
+                        f"&#128314\n\nStats:\n"
+                        f"├{md.hbold('ID')}: {md.hcode(message.from_user.id)}\n"
+                        f"├{md.hbold('Nick')}: @{message.from_user.username}\n"
+                        f"├{md.hbold('Is_bot')}: {message.from_user.is_bot}\n"
+                        , parse_mode='html'
+                    )
 
-            user = await self.user_service.get_user(message.from_user.id)
+            user = await self.api_service.get_user(message.from_user.id)
             menu = self.main_menu(user)
 
             if user['is_admin']:
                 menu.append(['➡ ADMIN_PANEL'])
 
             markup = TelegramBot.keyboard(menu)
+            await self.bot.set_chat_menu_button(message.from_user.id, types.MenuButtonWebApp('web', web_app=self.web_app_url))
 
             await self.bot.send_message(
                 message.from_user.id,
