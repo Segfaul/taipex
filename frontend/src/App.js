@@ -5,7 +5,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import Home from './components/Home';
 
-import icon from './assets/taipex_logo.png';
+import icon from './assets/taipex_logo_g_rework_icon.png';
 import PageNotFound from './components/error/PageNotFound';
 import ScrollToTop from './components/config/Scroll';
 import { ToastContainer } from 'react-toastify';
