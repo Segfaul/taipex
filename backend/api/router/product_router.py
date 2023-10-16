@@ -72,8 +72,8 @@ async def update_product(
         response = await product_service.update_product(product_id=product_id, title=title, price=price, description=description, img_url=img_url)
 
         if response != -1:
-            return response
-        
+            return {200: 'Successfully Updated product'}
+
         raise HTTPException(status_code=404, detail="No product with such id found in database")
 
     raise HTTPException(status_code=403, detail="Not enough rights to perform such an action")

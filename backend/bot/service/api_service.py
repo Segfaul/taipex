@@ -26,7 +26,7 @@ class ApiService:
                     content = await response.json()
                     return content
             elif method == "DELETE":
-                async with session.delete(link) as response:
+                async with session.delete(link, params=params) as response:
                     content = await response.json()
                     return content
             else:
@@ -52,6 +52,7 @@ class ApiService:
         )
         return response
 
+    @property
     @log(logger)
     async def get_user_list(self):
         response = await self.call_api(
@@ -61,6 +62,7 @@ class ApiService:
         )
         return response
     
+    @property
     @log(logger)
     async def get_user_list_admin(self):
         response = await self.call_api(
@@ -70,6 +72,7 @@ class ApiService:
         )
         return response
 
+    @property
     @log(logger)
     async def get_user_list_upstream(self):
         response = await self.call_api(
@@ -80,7 +83,7 @@ class ApiService:
         return response
 
     @log(logger)
-    async def change_notification(self, tg_id: int):
+    async def update_notification(self, tg_id: int):
         response = await self.call_api(
             root='/user/notification/change',
             method='PUT',
@@ -89,7 +92,7 @@ class ApiService:
         return response
 
     @log(logger)
-    async def change_admin(self, tg_id: int, is_admin: int):
+    async def update_admin(self, tg_id: int, is_admin: int):
         response = await self.call_api(
             root='/user/promote',
             method='PUT',
@@ -123,6 +126,7 @@ class ApiService:
         )
         return response
 
+    @property
     @log(logger)
     async def get_product_list(self):
         response = await self.call_api(

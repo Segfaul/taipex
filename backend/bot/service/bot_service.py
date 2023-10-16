@@ -1,3 +1,4 @@
+import json
 import inspect
 
 from aiogram import Bot, Dispatcher, executor, types
@@ -9,6 +10,9 @@ import aiogram.utils.markdown as md
 
 from backend.config import logger, log
 
+
+class Form_Product(StatesGroup):
+    product_info = State()
 
 class Form(StatesGroup):
     percent = State()
@@ -51,6 +55,14 @@ class TelegramBot:
     @property
     def admin_panel(cls) -> list:
         menu = [
+            [
+                "➕ ADD PRODUCT",
+                "➖ DELETE PRODUCT"
+            ],
+            [
+                "✔ PROMOTE USER",
+                "♻ UPD PRODUCT"
+            ],
             ["⬅ MENU"]
         ]
 
@@ -81,7 +93,7 @@ class TelegramBot:
                 menu.append(['➡ ADMIN_PANEL'])
 
             markup = TelegramBot.keyboard(menu)
-            await self.bot.set_chat_menu_button(message.from_user.id, types.MenuButtonWebApp('web', web_app=self.web_app_url))
+            await self.bot.set_chat_menu_button(message.from_user.id, types.MenuButtonWebApp('web', web_app=types.WebAppInfo(url=self.web_app_url)))
 
             await self.bot.send_message(
                 message.from_user.id,
@@ -98,7 +110,7 @@ class TelegramBot:
         @self.dp.message_handler(commands=['account', 'acc', 'акк', 'аккаунт'])
         @self.dp.message_handler(Text(equals=['👤 ACC'], ignore_case=True))
         async def commands_account(message: types.Message):
-            user = await self.user_service.get_user(message.from_user.id)
+            user = await self.api_service.get_user(message.from_user.id)
 
             menu = self.main_menu(user)
             if user['is_admin']:
@@ -108,8 +120,7 @@ class TelegramBot:
             await self.bot.send_message(
                 message.from_user.id,
                 f"\n&#128100My Profile:\n"
-                f"├Alert % (min): "
-                f"{md.hcode(str(user['percent']) + '%') if user['percent'] else md.hcode('1%')}\n"
+                f"\n&#128273API_key: {md.hspoiler(user['api_key'])}"
                 f"\n&#128276Alerts: {'on' if user['notification'] else 'off'}",
                 parse_mode='html',
                 reply_markup=markup
@@ -120,7 +131,7 @@ class TelegramBot:
         @self.dp.message_handler(commands=['help', 'hlp', 'hp', 'поддержка'])
         @self.dp.message_handler(Text(equals=['📎 HELP'], ignore_case=True))
         async def commands_help(message: types.Message):
-            user = await self.user_service.get_user(message.from_user.id)
+            user = await self.api_service.get_user(message.from_user.id)
             menu = self.main_menu(user)
             if user['is_admin']:
                 menu.append(['➡ ADMIN_PANEL'])
@@ -130,8 +141,8 @@ class TelegramBot:
                 message.from_user.id,
                 f"&#128206Details on each of the commands&#128206\n\n"
                 f"/acc {md.hitalic('- get your bot account details')}\n"
-                f"/sw {md.hitalic('- to resume/break connection to the parser notification')}\n"
-                f"/prc {md.hitalic('- % of profit from which notifications will be sent (standard: 1)')}\n",
+                f"/sw {md.hitalic('- to resume/break connection to market updates')}\n"
+                f"/product {md.hitalic('- get up-to-date product list')}\n",
                 parse_mode='html',
                 reply_markup=markup
             )
@@ -142,9 +153,9 @@ class TelegramBot:
         @self.dp.message_handler(commands=['status', 'st', 'switch', 'sw', 'change'])
         @self.dp.message_handler(Text(contains=['💡'], ignore_case=True))
         async def commands_status(message: types.Message):
-            result = await self.user_service.update_notification(message.from_user.id)
+            result = await self.api_service.update_notification(message.from_user.id)
 
-            user = await self.user_service.get_user(message.from_user.id)
+            user = await self.api_service.get_user(message.from_user.id)
             menu = self.main_menu(user)
             if user['is_admin']:
                 menu.append(['➡ ADMIN_PANEL'])
@@ -172,19 +183,77 @@ class TelegramBot:
             await message.delete()
 
         @log(logger)
-        @self.dp.message_handler(commands=['percent', '%', 'prc', 'процент'])
-        @self.dp.message_handler(Text(contains=['💸'], ignore_case=True))
-        async def commands_prc(message: types.Message):
+        @self.dp.message_handler(commands=['add_product', 'add_pr', 'new_pr'])
+        @self.dp.message_handler(Text(contains=['➕'], ignore_case=True))
+        async def commands_add_product(message: types.Message):
             markup = TelegramBot.keyboard(
                 [
                     ['X']
                 ]
             )
 
-            await Form.percent.set()
+            await Form_Product.product_info.set()
             await self.bot.send_message(
                 message.from_user.id,
-                "Enter % of which you'd like to receive eth price change cases\n"
+                "Enter product info in the following form &#10549\n"
+                "\n{\n"
+                '   "title": "...",\n'
+                '   "price": "...",\n'
+                '   "description": "...",\n'
+                '   "img_url": "https://..."\n'
+                "}\n\n"
+                "To cancel, type the command 👉 /cancel",
+                parse_mode='html',
+                reply_markup=markup
+            )
+
+            await message.delete()
+
+        @log(logger)
+        @self.dp.message_handler(commands=['upd_product', 'upd_pr'])
+        @self.dp.message_handler(Text(contains=['♻'], ignore_case=True))
+        async def commands_upd_product(message: types.Message):
+            markup = TelegramBot.keyboard(
+                [
+                    ['X']
+                ]
+            )
+
+            await Form_Product.product_info.set()
+            await self.bot.send_message(
+                message.from_user.id,
+                "Enter product info in the following form &#10549\n"
+                "\n{\n"
+                '   "product_id": "...",\n'
+                '   "title": "...",\n'
+                '   "price": "...",\n'
+                '   "description": "...",\n'
+                '   "img_url": "https://..."\n'
+                "}\n\n"
+                "To cancel, type the command 👉 /cancel",
+                parse_mode='html',
+                reply_markup=markup
+            )
+
+            await message.delete()
+
+        @log(logger)
+        @self.dp.message_handler(commands=['del_product', 'del_pr'])
+        @self.dp.message_handler(Text(contains=['➖'], ignore_case=True))
+        async def commands_del_product(message: types.Message):
+            markup = TelegramBot.keyboard(
+                [
+                    ['X']
+                ]
+            )
+
+            await Form_Product.product_info.set()
+            await self.bot.send_message(
+                message.from_user.id,
+                "Enter product info in the following form &#10549\n"
+                "\n{\n"
+                '   "product_id": "...",\n'
+                "}\n\n"
                 "To cancel, type the command 👉 /cancel",
                 parse_mode='html',
                 reply_markup=markup
@@ -205,8 +274,9 @@ class TelegramBot:
                 if current_state is None:
                     return
 
-                if current_state.split(':')[1] in ['percent', 'coin']:
-                    user = await self.user_service.get_user(message.from_user.id)
+                if current_state.split(':')[1] in ['some_state']:
+                    # Base User state handler
+                    user = await self.api_service.get_user(message.from_user.id)
                     menu = self.main_menu(user)
                     if user['is_admin']:
                         menu.append(['➡ ADMIN_PANEL'])
@@ -229,55 +299,57 @@ class TelegramBot:
                 await state.finish()
                 logger.info("%s", func_name)
 
-        @self.dp.message_handler(state=Form.percent)
-        async def process_prc(message: types.Message, state: FSMContext):
+        @self.dp.message_handler(state=Form_Product.product_info)
+        async def process_product_info(message: types.Message, state: FSMContext):
             func_name = inspect.currentframe().f_code.co_name
 
             try:
                 async with state.proxy() as data:
-                    data['percent'] = message.text
+                    data['product_info'] = message.text
 
-                result = await self.user_service.update_percent(message.from_user.id, float(data['percent']))
+                product_info = json.loads(data['product_info'])
 
-                user = await self.user_service.get_user(message.from_user.id)
-                menu = self.main_menu(user)
-                if user['is_admin']:
-                    menu.append(['➡ ADMIN_PANEL'])
-                markup = TelegramBot.keyboard(menu)
+                if 'product_id' in [*product_info]:
+                    if len([*product_info]) == 1:
+                        result = await self.api_service.delete_product(**product_info)
+                    
+                    else:
+                        result = await self.api_service.update_product(**product_info)
 
-                if result == 0:
+                else:
+                    result = await self.api_service.add_product(**product_info)
+
+                replies = {201: 'added', 200: 'updated', 204: 'deleted'}
+
+                if int(*result) in [*replies]:
 
                     await self.bot.send_message(
                         message.from_user.id,
                         md.text(
                             md.text(
-                                "Percent updated: " + md.hcode(data['percent'] + '%') + " &#128279"
+                                f"Product {replies[int(*result)]} successfully &#10004"
                             ),
                             sep='\n',
                         ),
                         parse_mode='html',
-                        reply_markup=markup
+                        reply_markup=TelegramBot.keyboard(self.admin_panel)
                     )
 
                 else:
                     await self.bot.send_message(
                         message.from_user.id, "Incorrect input &#128219 \n"
-                                              "Try again, type the command 👉 /prc", parse_mode='html',
-                        reply_markup=markup
+                                              "Try again 👇", parse_mode='html',
+                        reply_markup=TelegramBot.keyboard(self.admin_panel)
                     )
 
             except Exception as warning:
+                print(warning)
                 try:
-                    user = await self.user_service.get_user(message.from_user.id)['Response']
-                    menu = self.main_menu(user)
-                    if user['is_admin']:
-                        menu.append(['➡ ADMIN_PANEL'])
-                    markup = TelegramBot.keyboard(menu)
 
                     await self.bot.send_message(
                         message.from_user.id, "Unexpected error &#128219 \n"
-                                              "Try again, type the command 👉 /prc", parse_mode='html',
-                        reply_markup=markup
+                                              "Try again 👇", parse_mode='html',
+                        reply_markup=TelegramBot.keyboard(self.admin_panel)
                     )
                     logger.warning("%s/%s||%s", func_name, warning.__class__, warning.args[0])
 
@@ -293,8 +365,8 @@ class TelegramBot:
         @log(logger)
         @self.dp.message_handler(Text(equals=['⬅ MENU'], ignore_case=True))
         async def back_to_menu(message: types.Message):
-            if {'id': message.from_user.id} in (await self.user_service.get_admins):
-                user = await self.user_service.get_user(message.from_user.id)
+            if message.from_user.id in [admin['id'] for admin in (await self.api_service.get_user_list_admin)]:
+                user = await self.api_service.get_user(message.from_user.id)
                 menu = self.main_menu(user)
                 if user['is_admin']:
                     menu.append(['➡ ADMIN_PANEL'])
@@ -312,7 +384,7 @@ class TelegramBot:
         @log(logger)
         @self.dp.message_handler(Text(equals=['➡ ADMIN_PANEL'], ignore_case=True))
         async def enter_admin_panel(message: types.Message):
-            if {'id': message.from_user.id} in (await self.user_service.get_admins):
+            if message.from_user.id in [admin['id'] for admin in (await self.api_service.get_user_list_admin)]:
                 menu = self.admin_panel
                 markup = TelegramBot.keyboard(menu)
 
